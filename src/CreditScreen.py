@@ -6,6 +6,7 @@ Created on 7/22/20
 import logging
 import pandas as pd
 import tensorflow as tf
+from sklearn.model_selection import KFold
 
 
 class CreditScreen():
@@ -15,6 +16,7 @@ class CreditScreen():
         self.df = self.load_data()
         self.clean_data()
         self.model = self.create_model()
+        self.train_with_kfold()
 
     def load_data(self):
         df = pd.read_csv('../data/crx.data')
@@ -24,19 +26,39 @@ class CreditScreen():
     def clean_data(self):
         self.df.dropna(inplace=True)
 
+    def convert_data(self):
+        pass
+
     def create_model(self):
-        input = tf.keras.Input(shape=(15,1))
+        input = tf.keras.Input(shape=(15, 1))
         x = tf.keras.layers.Dense(30, activation=tf.nn.relu)(input)
-        output = tf.keras.layers.Dense(2,activation=tf.nn.softmax)(x)
+        output = tf.keras.layers.Dense(2, activation=tf.nn.softmax)(x)
 
         model = tf.keras.Model(inputs=input, outputs=output)
         logging.info(model.summary())
         
-        #Compile model
+        # Compile model
         opt = tf.keras.optimizers.SGD(lr=0.01, momentum=0.9)
         model.compile(optimizer=opt, loss='categorical_crossentropy', metrics=['accuracy'])
 
         return model
+
+    def train_with_kfold(self):
+        n_folds = 5
+        kfold = KFold(n_folds, shuffle=True, random_state=1)
+        train_data = self.df.values
+        for train_ix, test_ix in kfold.split(train_data):
+            # select rows for train and test
+            trainX, trainY, testX, testY = train_data[train_ix], train_data[train_ix], \
+                                           train_data[test_ix], train_data[test_ix]
+            # fit model
+            print(trainX.shape)
+            print(testX.shape)
+            history = self.model.fit(trainX, trainY, epochs=10, batch_size=32, validation_data=(testX, testY),
+                                     verbose=1)
+            # evaluate model
+            _, acc = self.model.evaluate(testX, testY, verbose=0)
+            print('> %.3f' % (acc * 100.0))
 
     def main(self):
         pass
